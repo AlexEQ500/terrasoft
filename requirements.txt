@@ -1,0 +1,6 @@
+numpy
+scipy
+laspy[lazrs]
+fastapi
+uvicorn
+ezdxf

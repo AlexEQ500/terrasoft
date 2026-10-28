@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terrasort</title>
+<script type="importmap">{"imports":{"three":"/static/vendor/three.module.js"}}</script>
+<style>
+:root{--bg:#0d0f12;--panel:#15181d;--panel2:#1c2027;--line:#2a2f38;--text:#e6e8eb;--dim:#8a919c;--acc:#e8742a;--acc2:#2f9e6b}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{display:grid;grid-template-columns:310px 1fr;height:100%}
+#side{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+h1{font-size:16px;margin:0}h1 small{color:var(--dim);font-weight:400;font-size:11px;margin-left:6px}
+h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 6px}
+section{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px}
+button,select,input,textarea{font:inherit;color:var(--text);background:#0f1216;border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+button{cursor:pointer}button:hover{border-color:#47505e}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600;width:100%;padding:9px}
+button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+#pickGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#pickGrid button{display:flex;align-items:center;gap:7px;text-align:left;padding:6px 8px}
+#pickGrid .sw{width:11px;height:11px;border-radius:3px;flex:0 0 11px}
+button:disabled{opacity:.45;cursor:default}
+.row{display:flex;gap:6px;align-items:center;margin-top:6px}.row>*{flex:1;min-width:0}
+.row label{flex:0 0 auto;color:var(--dim)}
+input[type=range]{padding:0;accent-color:var(--acc)}
+#legend div{display:flex;align-items:center;gap:8px;padding:3px 2px}
+#legend .sw{width:12px;height:12px;border-radius:3px;flex:0 0 12px}
+#legend .n{margin-left:auto;color:var(--dim);font-variant-numeric:tabular-nums}
+#legend input{flex:0 0 auto;accent-color:var(--acc)}
+#main{position:relative;overflow:hidden}
+#gl{position:absolute;inset:0}
+#tabs{position:absolute;top:10px;left:10px;display:flex;gap:6px;z-index:2;flex-wrap:wrap;max-width:calc(100% - 20px)}
+#tabs button.on{background:var(--acc)}
+#bar{position:absolute;left:10px;bottom:8px;color:var(--dim);font-size:12px;z-index:2;text-shadow:0 1px 2px #000}
+#prog{position:absolute;left:0;right:0;top:0;height:3px;background:transparent;z-index:5}
+#prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+#treePanel{position:absolute;right:10px;top:52px;width:262px;max-height:62%;background:#15181dee;border:1px solid var(--line);border-radius:8px;display:none;z-index:4;flex-direction:column}
+#treePanel .th{padding:7px 10px;cursor:pointer;font-weight:600;border-bottom:1px solid var(--line)}
+#treeBody{overflow:auto}
+#treeBody table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12px}
+#treeBody th{position:sticky;top:0;background:#1c2027;color:var(--dim);font-weight:500;padding:3px 4px;text-align:right}
+#treeBody td{padding:3px 4px;text-align:right;border-bottom:1px solid #20242b}
+#treeBody tr:hover td{background:#232830;cursor:pointer}
+#treeBody td.x{color:#f87171;cursor:pointer}
+.tl{position:absolute;background:#7f1d1dd9;border:1px solid #f87171;color:#fff;font-size:10.5px;line-height:1.15;padding:1px 3px;border-radius:3px;white-space:nowrap;transform:translate(6px,-100%)}
+#selrect{position:absolute;display:none;border:1.5px dashed #fff04d;background:#fff04d22;pointer-events:none;z-index:3}
+#brushcur{position:absolute;pointer-events:none;border:1.5px solid #fff;border-radius:50%;display:none;z-index:3;mix-blend-mode:difference}
+#section{position:absolute;right:12px;bottom:12px;width:min(680px,60%);background:var(--panel);border:1px solid var(--line);border-radius:10px;display:none;z-index:4;padding:10px}
+#section canvas{width:100%;height:260px;background:#0a0c0f;border-radius:6px;display:block;cursor:crosshair}
+#section .hd{flex-wrap:wrap;display:flex;gap:8px;align-items:center;margin-bottom:6px}
+#section .hd b{flex:1}
+#readout{color:var(--dim);margin-top:6px;font-variant-numeric:tabular-nums;min-height:1.3em}
+#drop{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#000a;z-index:9;font-size:20px}
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);z-index:1;pointer-events:none;text-align:center;padding:30px}
+.hint{color:var(--dim);font-size:11.5px;margin-top:6px}
+details summary{cursor:pointer;color:var(--dim)}
+textarea{width:100%;height:80px;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;margin-top:6px}
+@media (max-width:760px){#app{grid-template-columns:1fr;grid-template-rows:auto 1fr}#side{max-height:44vh}}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1>Terrasort <small>point cloud classifier · <span id="ver">…</span></small></h1>
+
+    <section>
+      <h2>1 · Data</h2>
+      <div class="row"><button id="openBtn">Open LAS / LAZ…</button></div>
+      <input id="file" type="file" accept=".las,.laz" hidden>
+      <div class="hint" id="fileinfo">No file loaded. You can also drop a file onto the viewer.</div>
+    </section>
+
+    <section>
+      <h2>2 · Classify</h2>
+      <div class="row"><label>Sensor</label><select id="profile"></select></div>
+      <div class="row"><label>Terrain</label><select id="terrain">
+        <option value="">Hills · gentle relief (default)</option>
+        <option value="flat">Flat · fields, paving</option>
+        <option value="slopes">Slopes · steep ground</option>
+        <option value="city">City · buildings and trees</option></select></div>
+      <div class="row"><label>Low flat</label><select id="lowflat">
+        <option value="class">Own class (steps, plinths)</option>
+        <option value="ground">Count as ground</option>
+        <option value="off">Off (leave unclassified)</option></select></div>
+      <details><summary>Advanced: override thresholds</summary>
+        <textarea id="overrides" spellcheck="false">{}</textarea>
+        <div class="hint">JSON, e.g. {"ground_th": 0.1, "kerb_min_step": 0.05}</div>
+      </details>
+      <div class="row"><button class="primary" id="classifyBtn" disabled>Classify</button></div>
+    </section>
+
+    <section>
+      <h2>Classes</h2>
+      <div class="row" style="gap:4px;margin-bottom:6px"><button id="visAll" style="flex:1">All on</button><button id="visNone" style="flex:1">All off</button><button id="visInv" style="flex:1">Invert</button></div>
+      <div id="legend"></div>
+    </section>
+
+    <section>
+      <h2>3 · Pick object</h2>
+      <div class="hint" style="margin:0 0 6px">Choose what it is, then click it in the cloud. Each class has its own rule for what gets selected.</div>
+      <div id="pickGrid"></div>
+      <div class="row" id="objRow" style="display:none"><label>Object as</label><select id="objClass"></select></div>
+      <div id="areaRows" style="display:none">
+        <div class="row"><label>Shape</label><select id="areaShape"><option value="rect">Rectangle</option><option value="lasso">Lasso (contour)</option></select></div>
+        <div class="row"><label>Set to</label><select id="areaTo"></select></div>
+        <div class="row"><label>Only</label><select id="areaFrom"></select></div>
+        <div class="row"><label style="flex:1"><input type="checkbox" id="areaThrough" style="flex:0"> through all depth</label></div>
+      </div>
+      <div class="row" id="reachRow" style="display:none"><label>Reach</label><input id="pickReach" type="range" min="0" max="60" value="0"><span id="pickReachV" style="flex:0 0 46px;text-align:right;color:var(--dim)">auto</span></div>
+      <div class="row"><label style="flex:1"><input type="checkbox" id="pvOn" checked style="flex:0"> preview before applying</label></div>
+      <div class="row" id="pvRow" style="display:none"><span id="pvText" style="flex:1 1 auto;color:#fff04d"></span><button id="pvApply" class="primary" style="width:auto;padding:5px 10px;flex:0 0 auto">Apply</button><button id="pvCancel" style="flex:0 0 auto">Cancel</button></div>
+      <div class="hint" id="pickHint">No pick tool active.</div>
+    </section>
+
+    <section>
+      <h2>4 · Brush correction</h2>
+      <div class="row"><button id="brushBtn" disabled>Brush (B)</button><button id="undoBtn" disabled>Undo (Ctrl+Z)</button></div>
+      <div class="row"><label>Set to</label><select id="paintClass"></select></div>
+      <div class="row"><label>Only</label><select id="fromClass"></select></div>
+      <div class="row"><label>Size</label><input id="brushR" type="range" min="4" max="140" value="28"></div>
+      <div class="row"><label>Depth</label><input id="brushD" type="range" min="1" max="60" value="8"><span id="brushDv" style="flex:0 0 46px;text-align:right;color:var(--dim)">0.8 m</span></div>
+      <div class="row"><label style="flex:1"><input type="checkbox" id="wholeCol" style="flex:0"> whole column (ignore depth)</label></div>
+      <div class="hint">Brush paints only the front surface within “Depth”. While the brush is on: left-drag paints, right-drag rotates, middle-drag pans.</div>
+    </section>
+
+    <section>
+      <h2>5 · Trees</h2>
+      <div class="row"><button class="primary" id="stemsBtn" disabled style="background:var(--acc2);border-color:var(--acc2)">Find stems</button></div>
+      <div class="row"><label>Search area</label><select id="stemShape" style="flex:1.2"><option value="rect">Rectangle</option><option value="lasso">Lasso</option></select><button id="areaDrawBtn" disabled>Draw…</button><button id="areaClrBtn" disabled>Clear</button></div>
+      <div class="hint" id="areaInfo" style="margin-top:2px">Search area: whole scan. Draw one or more areas in top view to limit Find stems to them.</div>
+      <div class="row"><label>Ø min / max</label><input id="dbhMin" type="number" value="0.08" step="0.02" min="0.03"><input id="dbhMax" type="number" value="1.2" step="0.1" min="0.2"></div>
+      <div class="row"><button id="circBtn" disabled>Circle by hand</button><button id="crownBtn" disabled>Crown edge</button></div>
+      <div class="row"><label>Search radius</label><input id="circR" type="number" value="0.7" step="0.1" min="0.2"><span style="flex:0 0 14px;color:var(--dim)">m</span></div>
+      <div class="row"><button id="lastBtn" disabled>Remove last</button><button id="csvBtn" disabled>List CSV…</button><button id="dxfBtn" disabled>DXF…</button></div>
+      <div class="row"><label style="flex:1"><input type="checkbox" id="tDiam" checked style="flex:0"> diameters</label><label style="flex:1"><input type="checkbox" id="tLab" checked style="flex:0"> labels</label></div>
+      <div class="hint" id="treeHint">Classify, then Find stems. Diameter is measured 1.0–1.6 m above the ground. Circle by hand: click a trunk. Crown edge: click the outer edge of a tree's crown.</div>
+    </section>
+
+    <section>
+      <h2>6 · Ground model</h2>
+      <div class="hint" style="margin-top:0">Built from the ground group (Ground + its sub-classes), after any manual corrections.</div>
+      <div class="row"><label style="flex:1"><input type="checkbox" id="gG" checked style="flex:0"> Ground</label><label style="flex:1"><input type="checkbox" id="gK" checked style="flex:0"> Kerb</label><label style="flex:1"><input type="checkbox" id="gL" checked style="flex:0"> Low flat</label></div>
+      <div class="row"><button id="csvLoad">Load CSV points…</button><button id="csvClr" disabled>Remove</button><input type="file" id="csvFile" accept=".csv,.txt,.xyz,.pts,.dat" style="display:none"></div>
+      <div class="row"><button id="csvDelBtn" disabled title="Click individual CSV points in the view to remove them">Delete CSV points</button><button id="csvUndoBtn" disabled>Undo delete</button></div>
+      <div id="csvMap" style="display:none">
+        <div class="row"><label>X</label><select id="cvX"></select><label>Y</label><select id="cvY"></select><label>Z</label><select id="cvZ"></select></div>
+        <div class="row"><label style="flex:1"><input type="checkbox" id="cvHead" style="flex:0"> first row is a header</label><button id="cvUse" class="primary">Use points</button></div>
+        <div class="hint" id="cvPrev" style="margin-top:0"></div>
+      </div>
+      <div class="row"><label style="flex:1"><input type="checkbox" id="csvUse" checked style="flex:0"> use CSV points</label><label style="flex:1" title="A cell that contains a CSV point uses only the CSV points, not the scan"><input type="checkbox" id="csvPrio" checked style="flex:0"> CSV first in its cell</label></div>
+      <div class="row"><label>Cell size</label><input id="dtmCell" type="number" value="0.25" step="0.05" min="0.05"><span style="flex:0 0 14px;color:var(--dim)">m</span><label>Max gap</label><input id="dtmGap" type="number" value="10" step="1" min="1"><span style="flex:0 0 14px;color:var(--dim)">m</span></div>
+      <div class="row"><label>TIFF</label><select id="dtmKind" style="flex:1.4"><option value="elev">Elevation (float32)</option><option value="shade">Shaded picture (RGB)</option></select><label>CRS tag</label><select id="dtmEpsg" style="flex:1.3" title="Only tag the file if you are sure; a wrong tag puts it in the wrong place"><option value="0">None (set in viewer)</option><option value="29903">Irish Grid TM75 (29903)</option><option value="29902">Irish Grid TM65 (29902)</option><option value="2157">ITM (2157)</option><option value="27700">British National Grid (27700)</option></select></div>
+      <div class="row"><button id="dtmBtn" disabled>DTM TIFF + .tfw</button></div>
+      <div class="row"><label>Contours</label><input id="conInt" type="number" value="0.25" step="0.05" min="0.01"><span style="flex:0 0 14px;color:var(--dim)">m</span><label>Major</label><input id="conMajor" type="number" value="5" min="0"><span style="flex:0 0 14px;color:var(--dim)">×</span></div>
+      <div class="row"><label>Smooth</label><input id="conSmooth" type="number" value="1" step="0.5" min="0"><span style="flex:0 0 40px;color:var(--dim)">cells</span><button id="conBtn" disabled>Contours DXF</button></div>
+      <div class="row"><button id="gvBtn" disabled class="primary">Show in viewer</button><button id="gvClr" disabled>Clear</button></div>
+      <div class="row"><label style="flex:1"><input type="checkbox" id="gvAuto" checked style="flex:0"> update the surface automatically after class changes or deleting CSV points</label></div>
+      <div class="row"><label style="flex:1"><input type="checkbox" id="showDtm" checked style="flex:0"> surface</label><label style="flex:1"><input type="checkbox" id="showCon" checked style="flex:0"> contours</label><input id="dtmOp" type="range" min="10" max="100" value="100" title="surface opacity"></div>
+      <div class="hint" id="dtmInfo">Cells further than “Max gap” from any ground point are left empty. The TIFF comes with a world file (.tfw) of the same name: keep them together. DXF files carry no coordinate system: when you open them in QGIS set the layer CRS to your survey grid yourself. All exports use your scan’s own coordinates. EPSG is optional.</div>
+    </section>
+
+    <section>
+      <h2>Tools</h2>
+      <div class="row"><button id="secBtn" disabled>Section…</button><button id="topBtn" disabled>Top view</button><button id="isoBtn" disabled>Reset view</button></div>
+      <div class="row"><button id="orthoBtn" disabled>Ortho</button><button id="wasBtn" disabled title="Show the classification as it was before your manual edits">Was</button></div>
+      <div class="row"><label>Point size</label><input id="psize" type="range" min="1" max="8" step="0.5" value="2"></div>
+      <div class="row"><label>Points</label><input id="pkeep" type="range" min="2" max="100" value="100"><span id="pkeepV" style="flex:0 0 40px;text-align:right;color:var(--dim)">100%</span></div>
+      <div class="row"><label style="flex:0 0 auto"><input type="checkbox" id="xray" style="flex:0"> X-ray</label><input id="xrayA" type="range" min="5" max="100" value="35"></div>
+      <div class="row"><button id="exportBtn" disabled>Export classified LAS</button></div>
+    </section>
+  </aside>
+
+  <main id="main">
+    <div id="prog"><i></i></div>
+    <div id="tabs">
+      <button data-mode="0" class="on">Class</button>
+      <button data-mode="1" id="tabRgb">Colour</button>
+      <button data-mode="2">Elevation</button>
+      <button data-mode="3">Height above ground</button>
+      <button data-mode="4" id="tabInt">Intensity</button>
+      <button data-mode="5" id="tabStems">Stems</button>
+    </div>
+    <div id="adj" style="position:absolute;top:44px;left:12px;z-index:4;display:none;background:#111827dd;border:1px solid #334155;border-radius:6px;padding:6px 10px;font-size:12px;color:#e5e7eb">
+      <label>Brightness <input id="adjB" type="range" min="-50" max="50" value="0" style="width:90px"></label>
+      <label>Contrast <input id="adjC" type="range" min="50" max="300" value="100" style="width:90px"></label>
+      <label>Gamma <input id="adjG" type="range" min="30" max="250" value="100" style="width:90px"></label>
+      <label id="adjIL">Clip low <input id="adjLo" type="range" min="0" max="60" value="0" style="width:80px"></label>
+      <label id="adjIH">Clip high <input id="adjHi" type="range" min="40" max="100" value="100" style="width:80px"></label>
+      <button id="adjR">Reset</button>
+    </div>
+    <div id="empty">Open a LAS/LAZ file to begin.<br>Terrasort classifies ground, kerbs, walls, trees and people.</div>
+    <canvas id="gl"></canvas>
+    <div id="brushcur"></div>
+    <div id="selrect"></div>
+    <svg id="lasso" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;display:none"><polyline fill="#fff04d22" stroke="#fff04d" stroke-width="1.5" stroke-dasharray="5 4" points=""/></svg>
+    <div id="tlabels" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2"></div>
+    <div id="treePanel"><div class="th" id="treeHead">▾ Trees — <span id="treeCount">0</span></div><div id="treeBody"></div></div>
+    <div id="bar"></div>
+    <div id="section">
+      <div class="hd"><b>Section</b>
+        <label>Width <input id="secW" type="number" value="1" min="0.1" step="0.1" style="width:64px"> m</label>
+        <label>V exag. <select id="secV"><option>1</option><option>2</option><option>3</option><option>5</option><option>10</option></select></label>
+        <select id="secCol" title="Point colour in the DXF"><option value="class">Class colour</option><option value="rgb">RGB colour</option></select><button id="secDxf" title="Section view as DXF: coloured points + ground profile line">Section DXF</button><button id="secPlan" title="The section line (and strip) in plan view as DXF">Plan line DXF</button>
+        <button id="secPick">New line</button><button id="secClose">Close</button></div>
+      <canvas id="secCanvas" width="1300" height="520"></canvas>
+      <div id="readout">Click two points on the section to measure.</div>
+    </div>
+    <div id="drop">Drop LAS / LAZ to load</div>
+  </main>
+</div>
+<script type="module" src="/static/app.js?v=20261028c"></script>
+</body>
+</html>
